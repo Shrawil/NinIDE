@@ -25,7 +25,11 @@ SECRET_KEY = 'django-insecure-9ijtt8b(5s!*mmkv#prfrf402o5gzy6(vp+x4*ktn$!$3e07hx
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    '127.0.0.1',
+    'localhost',
+    'ninide.onrender.com',
+]
 
 PROJECTS_DIR = BASE_DIR / "projects"
 
