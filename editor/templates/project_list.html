@@ -1,19 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
-    {% if projects %}
+{% if projects %}
+    <form method="POST" action="{% url 'new_project' %}" style="text-align: center;">
+        <br><h3>Create New project</h3><br>
+        {% csrf_token %}
+        <input placeholder="Enter project name" name="projectname">
+        <button type="submit">Create</button>
+    </form>
     {% for project in projects %}
-    <ol>
+    <ul>
         <li><a href="{% url 'editor' project.id %}" class="link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover"> {{project.name}}</a></li>
-    </ol>
+    </ul>
     {% endfor %}
     {% else %}
-    <div style="text-align:center;">
-        <form method="POST" action="{% url 'new_project' %}">
-            <br><h3>No Project found. Create one!</h3><br>
-            {% csrf_token %}
-            <input placeholder="Enter project name" name="projectname">
-            <button type="submit">Create</button>
-        </form>
-    </div>
+    <form method="POST" action="{% url 'new_project' %}" style="text-align: center;">
+        <br><h3>Create New project</h3><br>
+        {% csrf_token %}
+        <input placeholder="Enter project name" name="projectname">
+        <button type="submit">Create</button>
+    </form>
     {% endif %}
 {% endblock %}
