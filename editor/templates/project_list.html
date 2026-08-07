@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+    {% if projects %}
+    {% for project in projects %}
+    <ol>
+        <li><a href="{% url 'editor' project.id %}" class="link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover"> {{project.name}}</a></li>
+    </ol>
+    {% endfor %}
+    {% else %}
+    <div style="text-align:center;">
+        <form method="POST" action="{% url 'new_project' %}">
+            <br><h3>No Project found. Create one!</h3><br>
+            {% csrf_token %}
+            <input placeholder="Enter project name" name="projectname">
+            <button type="submit">Create</button>
+        </form>
+    </div>
+    {% endif %}
+{% endblock %}

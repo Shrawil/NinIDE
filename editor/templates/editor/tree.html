@@ -1,0 +1,24 @@
+{% for item in tree %}
+    {% if item.is_directory %}
+        <div class="folder" data-path="{{ item.name }}">
+            <div
+                class="folder-header d-flex align-items-center gap-2 px-2 py-1 rounded"
+            >
+                <i class="bi bi-chevron-right folder-arrow"></i>
+                <i class="bi bi-folder-fill"></i>
+                <span>{{ item.name }}</span>
+            </div>
+            <div class="folder-children ms-3 d-none">
+                {% include "editor/tree.html" with tree=item.children %}
+            </div>
+        </div>
+    {% else %}
+        <a
+            href="{% url 'open_file' item.file.id %}"
+            class="file-item d-flex align-items-center gap-2 px-2 py-1 rounded text-decoration-none"
+        >
+            <i class="bi bi-file-earmark-code"></i>
+            <span>{{ item.name }}</span>
+        </a>
+    {% endif %}
+{% endfor %}
