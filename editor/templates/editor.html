@@ -4,55 +4,296 @@
 {{ project.name }} | NinIDE
 {% endblock %}
 
+{% block css %}
+{% load static %} <link rel="stylesheet" href="{% static 'editor/editor.css' %}">
+<style>
+    :root {
+        --ide-bg: #1e1e1e;
+        --ide-sidebar-bg: #252526;
+        --ide-toolbar-bg: #2d2d2d;
+        --ide-border: #3c3c3c;
+        --ide-text: #d4d4d4;
+        --ide-muted: #858585;
+        --ide-accent: #0e639c;
+        --ide-accent-hover: #1177bb;
+    }
+
+    html, body {
+        height: 100%;
+        margin: 0;
+        background-color: var(--ide-bg);
+        color: var(--ide-text);
+    }
+
+    /* Outer Layout Structure */
+    .ide-layout {
+        display: flex;
+        height: calc(100vh - 56px); /* Adjust to match navbar height */
+        overflow: hidden;
+        background-color: var(--ide-bg);
+    }
+
+    /* Mobile Sidebar / Offcanvas Width Fix */
+    .file-sidebar.offcanvas-lg {
+        max-width: 280px !important; /* Prevents sidebar from stretching full screen */
+        background-color: var(--ide-sidebar-bg) !important;
+        border-right: 1px solid var(--ide-border);
+        color: var(--ide-text);
+    }
+
+    .sidebar-header {
+        padding: 12px;
+        border-bottom: 1px solid var(--ide-border);
+    }
+
+    .project-name {
+        color: var(--ide-text);
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+
+    .sidebar-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 10px;
+    }
+
+    .sidebar-actions .btn {
+        flex: 1;
+        border-color: var(--ide-border);
+        color: var(--ide-text);
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .sidebar-actions .btn:hover {
+        background: var(--ide-accent);
+        border-color: var(--ide-accent);
+    }
+
+    .file-tree {
+        padding: 10px;
+        overflow-y: auto;
+    }
+
+    .file-tree a, 
+    .file-tree .folder-header {
+        color: var(--ide-text) !important;
+        text-decoration: none;
+        padding: 4px 6px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .file-tree a:hover, 
+    .file-tree .folder-header:hover {
+        background-color: rgba(255, 255, 255, 0.08);
+    }
+
+    /* Editor Area */
+    .editor-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        background-color: var(--ide-bg);
+    }
+
+    .editor-toolbar {
+        background-color: var(--ide-toolbar-bg);
+        border-bottom: 1px solid var(--ide-border);
+        padding: 8px 12px;
+        color: var(--ide-text);
+        font-size: 0.85rem;
+    }
+
+    .editor-form {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        padding: 10px;
+    }
+
+    /* Dark Code Editor Textarea */
+    #editor {
+        width: 100%;
+        flex: 1;
+        min-height: 0;
+        background-color: #1e1e1e;
+        color: #d4d4d4;
+        border: 1px solid var(--ide-border);
+        border-radius: 4px;
+        padding: 12px;
+        font-family: 'Consolas', 'Fira Code', 'Courier New', monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        outline: none;
+        resize: none;
+        tab-size: 4;
+    }
+
+    #editor:focus {
+        border-color: var(--ide-accent);
+    }
+
+    .editor-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 10px;
+        color: var(--ide-muted);
+        font-size: 0.8rem;
+    }
+
+    .editor-footer .btn-success {
+        background-color: var(--ide-accent);
+        border-color: var(--ide-accent);
+    }
+
+    .editor-footer .btn-success:hover {
+        background-color: var(--ide-accent-hover);
+        border-color: var(--ide-accent-hover);
+    }
+
+    /* Empty state styling */
+    .empty-editor {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: var(--ide-muted);
+    }
+
+    .empty-editor i {
+        font-size: 3rem;
+        margin-bottom: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block navbar_actions %} <a href="{% url 'terminal' project.id %}" class="btn btn-dark btn-sm"> <i class="bi bi-terminal"></i> <span class="d-none d-sm-inline">Terminal</span> </a>
+
+<button
+    class="btn btn-outline-light btn-sm d-lg-none"
+    type="button"
+    data-bs-toggle="offcanvas"
+    data-bs-target="#fileSidebar"
+    aria-controls="fileSidebar"
+>
+    <i class="bi bi-folder2-open"></i>
+    <span class="d-none d-sm-inline">Files</span>
+</button>
+
+{% endblock %}
+
 {% block content %}
 
-<div class="row">
+<div class="ide-layout">
+<!-- FILE SIDEBAR -->
+<aside
+    class="file-sidebar offcanvas-lg offcanvas-start"
+    tabindex="-1"
+    id="fileSidebar"
+    aria-labelledby="fileSidebarLabel"
+>
 
-    <!-- FILE TREE -->
-    <div class="col-3 border-end vh-100 overflow-auto">
+    <div class="sidebar-header">
 
-        <h5 class="mt-3">
-            {{ project.name }}
-        </h5>
+        <div class="d-flex align-items-center justify-content-between">
 
-        <div class="d-flex gap-2 mb-2">
+            <div class="min-width-0">
+                <h5
+                    id="fileSidebarLabel"
+                    class="project-name mb-0"
+                    title="{{ project.name }}"
+                >
+                    {{ project.name }}
+                </h5>
+            </div>
 
-            <a
-                href="{% url 'terminal' project.id %}"
-                class="btn btn-dark btn-sm"
-            >
-                <i class="bi bi-terminal"></i>
-                Terminal
-            </a>
+            <!-- Close button only visible on mobile -->
+            <button
+                type="button"
+                class="btn-close btn-close-white d-lg-none"
+                data-bs-dismiss="offcanvas"
+                data-bs-target="#fileSidebar"
+                aria-label="Close"
+            ></button>
+
+        </div>
+
+        <div class="sidebar-actions">
 
             <button
                 class="btn btn-outline-secondary btn-sm"
                 data-bs-toggle="modal"
                 data-bs-target="#createFileModal"
+                title="Create file"
             >
                 <i class="bi bi-file-plus"></i>
+                <span>File</span>
             </button>
 
             <button
                 class="btn btn-outline-secondary btn-sm"
                 data-bs-toggle="modal"
                 data-bs-target="#createFolderModal"
+                title="Create folder"
             >
                 <i class="bi bi-folder-plus"></i>
+                <span>Folder</span>
             </button>
+
         </div>
-        <hr>
 
-        <!-- TREE -->
+    </div>
 
-        <div class="file-tree">
+    <div class="file-tree">
 
-            {% if tree %}
-                {% include "editor/tree.html" with tree=tree %}
+        {% if tree %}
+
+            {% include "editor/tree.html" with tree=tree %}
+
+        {% else %}
+
+            <p class="text-muted small px-2">
+                No files.
+            </p>
+
+        {% endif %}
+
+    </div>
+
+</aside>
+
+
+<!-- EDITOR -->
+<section class="editor-area">
+
+    <div class="editor-toolbar">
+
+        <div class="file-title min-width-0">
+
+            {% if selected_file %}
+
+                <i class="bi bi-file-earmark-code me-2"></i>
+
+                <span
+                    title="{{ selected_file.path }}"
+                >
+                    {{ selected_file.path }}
+                </span>
+
             {% else %}
-                <p class="text-muted">
-                    No files.
-                </p>
+
+                <span class="text-muted">
+                    <i class="bi bi-file-earmark me-2"></i>
+                    Select a file
+                </span>
+
             {% endif %}
 
         </div>
@@ -60,269 +301,331 @@
     </div>
 
 
-    <!-- EDITOR -->
+    {% if selected_file %}
 
-    <div class="col-9">
+        <form
+            method="POST"
+            action="{% url 'save_file' selected_file.id %}"
+            class="editor-form"
+        >
 
-        <div class="d-flex justify-content-between align-items-center mt-3">
+            {% csrf_token %}
 
-            <h5>
-                {% if selected_file %}
-                    {{ selected_file.path }}
-                {% else %}
-                    Select a file
-                {% endif %}
-            </h5>
+            <textarea
+                id="editor"
+                name="content"
+                spellcheck="false"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+            >{{ selected_file.content }}</textarea>
 
-        </div>
+            <div class="editor-footer">
 
+                <span class="editor-hint">
+                    <i class="bi bi-keyboard"></i>
+                    Tab = 4 spaces
+                </span>
 
-        {% if selected_file %}
-            <form
-                method="POST"
-                action="{% url 'save_file' selected_file.id %}"
-            >
-                {% csrf_token %}
-
-                <textarea
-                    id="editor"
-                    name="content"
-                    class="form-control mt-3"
-                    style="
-                        height: 70vh;
-                        font-family: monospace;
-                        resize: none;
-                    "
-                >{{ selected_file.content }}</textarea>
-
-                <button class="btn btn-success mt-2">
+                <button
+                    type="submit"
+                    class="btn btn-success btn-sm px-3"
+                >
+                    <i class="bi bi-save me-1"></i>
                     Save
                 </button>
 
-            </form>
+            </div>
 
-        {% endif %}
+        </form>
 
-    </div>
+    {% else %}
+
+        <div class="empty-editor">
+
+            <i class="bi bi-code-square"></i>
+
+            <h5>No file selected</h5>
+
+            <p>
+                Select a file from the sidebar to start editing.
+            </p>
+
+            <button
+                class="btn btn-outline-secondary btn-sm d-lg-none"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#fileSidebar"
+            >
+                <i class="bi bi-folder2-open me-1"></i>
+                Open Files
+            </button>
+
+        </div>
+
+    {% endif %}
+
+</section>
+
 
 </div>
+
+<!-- CREATE FILE MODAL -->
+
 <div
     class="modal fade"
     id="createFileModal"
     tabindex="-1"
+    aria-hidden="true"
 >
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-centered">
 
-        <div class="modal-content">
 
-            <div class="modal-header">
+    <div class="modal-content">
 
-                <h5 class="modal-title">
-                    Create File
-                </h5>
+        <div class="modal-header">
 
-                <button
-                    type="button"
-                    class="btn-close"
-                    data-bs-dismiss="modal"
-                ></button>
+            <h5 class="modal-title">
+                <i class="bi bi-file-plus me-2"></i>
+                Create File
+            </h5>
 
-            </div>
-
-            <form
-                method="POST"
-                action="{% url 'create_file' project.id %}"
-            >
-
-                {% csrf_token %}
-
-                <div class="modal-body">
-
-                    <div class="mb-3">
-
-                        <label class="form-label">
-                            File name
-                        </label>
-
-                        <input
-                            type="text"
-                            name="name"
-                            class="form-control"
-                            placeholder="e.g. urls.py"
-                            required
-                        >
-
-                    </div>
-
-                    <div class="mb-3">
-
-                        <label class="form-label">
-                            Folder
-                        </label>
-
-                        <input
-                            type="text"
-                            name="path"
-                            class="form-control"
-                            placeholder="e.g. myapp"
-                        >
-
-                        <div class="form-text">
-                            Leave empty to create it in the project root.
-                        </div>
-
-                    </div>
-
-                </div>
-
-                <div class="modal-footer">
-
-                    <button
-                        type="button"
-                        class="btn btn-secondary"
-                        data-bs-dismiss="modal"
-                    >
-                        Cancel
-                    </button>
-
-                    <button
-                        type="submit"
-                        class="btn btn-primary"
-                    >
-                        Create File
-                    </button>
-
-                </div>
-
-            </form>
+            <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+            ></button>
 
         </div>
 
+        <form
+            method="POST"
+            action="{% url 'create_file' project.id %}"
+        >
+
+            {% csrf_token %}
+
+            <div class="modal-body">
+
+                <div class="mb-3">
+
+                    <label class="form-label">
+                        File name
+                    </label>
+
+                    <input
+                        type="text"
+                        name="name"
+                        class="form-control"
+                        placeholder="e.g. urls.py"
+                        required
+                    >
+
+                </div>
+
+                <div class="mb-3">
+
+                    <label class="form-label">
+                        Folder
+                    </label>
+
+                    <input
+                        type="text"
+                        name="path"
+                        class="form-control"
+                        placeholder="e.g. myapp"
+                    >
+
+                    <div class="form-text">
+                        Leave empty to create it in the project root.
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    data-bs-dismiss="modal"
+                >
+                    Cancel
+                </button>
+
+                <button
+                    type="submit"
+                    class="btn btn-primary"
+                >
+                    Create File
+                </button>
+
+            </div>
+
+        </form>
+
     </div>
+
 </div>
+
+
+</div>
+
+<!-- CREATE FOLDER MODAL -->
+
 <div
     class="modal fade"
     id="createFolderModal"
     tabindex="-1"
+    aria-hidden="true"
 >
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-centered">
 
-        <div class="modal-content">
 
-            <div class="modal-header">
+    <div class="modal-content">
 
-                <h5 class="modal-title">
-                    Create Folder
-                </h5>
+        <div class="modal-header">
 
-                <button
-                    type="button"
-                    class="btn-close"
-                    data-bs-dismiss="modal"
-                ></button>
+            <h5 class="modal-title">
+                <i class="bi bi-folder-plus me-2"></i>
+                Create Folder
+            </h5>
 
-            </div>
-
-            <form
-                method="POST"
-                action="{% url 'create_folder' project.id %}"
-            >
-
-                {% csrf_token %}
-
-                <div class="modal-body">
-
-                    <div class="mb-3">
-
-                        <label class="form-label">
-                            Folder name
-                        </label>
-
-                        <input
-                            type="text"
-                            name="name"
-                            class="form-control"
-                            placeholder="e.g. templates"
-                            required
-                        >
-
-                    </div>
-
-                    <div class="mb-3">
-
-                        <label class="form-label">
-                            Parent folder
-                        </label>
-
-                        <input
-                            type="text"
-                            name="path"
-                            class="form-control"
-                            placeholder="e.g. myapp"
-                        >
-
-                        <div class="form-text">
-                            Leave empty to create it in the project root.
-                        </div>
-
-                    </div>
-
-                </div>
-
-                <div class="modal-footer">
-
-                    <button
-                        type="button"
-                        class="btn btn-secondary"
-                        data-bs-dismiss="modal"
-                    >
-                        Cancel
-                    </button>
-
-                    <button
-                        type="submit"
-                        class="btn btn-primary"
-                    >
-                        Create Folder
-                    </button>
-
-                </div>
-
-            </form>
+            <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+            ></button>
 
         </div>
 
+        <form
+            method="POST"
+            action="{% url 'create_folder' project.id %}"
+        >
+
+            {% csrf_token %}
+
+            <div class="modal-body">
+
+                <div class="mb-3">
+
+                    <label class="form-label">
+                        Folder name
+                    </label>
+
+                    <input
+                        type="text"
+                        name="name"
+                        class="form-control"
+                        placeholder="e.g. templates"
+                        required
+                    >
+
+                </div>
+
+                <div class="mb-3">
+
+                    <label class="form-label">
+                        Parent folder
+                    </label>
+
+                    <input
+                        type="text"
+                        name="path"
+                        class="form-control"
+                        placeholder="e.g. myapp"
+                    >
+
+                    <div class="form-text">
+                        Leave empty to create it in the project root.
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    data-bs-dismiss="modal"
+                >
+                    Cancel
+                </button>
+
+                <button
+                    type="submit"
+                    class="btn btn-primary"
+                >
+                    Create Folder
+                </button>
+
+            </div>
+
+        </form>
+
     </div>
+
 </div>
 
-<!-- FOLDER JAVASCRIPT -->
+
+</div>
+
+{% endblock %}
+
+{% block js %}
 
 <script>
 
-const editor = document.getElementById("editor");
-
-if (editor) {
-    editor.addEventListener("keydown", function(e) {
-
-        if (e.key === "Tab") {
-            e.preventDefault();
-
-            const start = this.selectionStart;
-            const end = this.selectionEnd;
-
-            this.value =
-                this.value.substring(0, start) +
-                "    " +
-                this.value.substring(end);
-        }
-
-    });
-}
-
 document.addEventListener("DOMContentLoaded", function () {
 
-    const expandedFolders =
-        JSON.parse(localStorage.getItem("expandedFolders") || "[]");
+    /*
+     * TAB SUPPORT
+     */
+
+    const editor = document.getElementById("editor");
+
+    if (editor) {
+
+        editor.addEventListener("keydown", function (e) {
+
+            if (e.key === "Tab") {
+
+                e.preventDefault();
+
+                const start = this.selectionStart;
+                const end = this.selectionEnd;
+
+                this.value =
+                    this.value.substring(0, start) +
+                    "    " +
+                    this.value.substring(end);
+
+                this.selectionStart = this.selectionEnd = start + 4;
+
+            }
+
+        });
+
+    }
+
+
+    /*
+     * FOLDER STATE
+     */
+
+    const STORAGE_KEY = "ninide_expanded_folders";
+
+    let expandedFolders = JSON.parse(
+        localStorage.getItem(STORAGE_KEY) || "[]"
+    );
+
+
+    /*
+     * RESTORE EXPANDED FOLDERS
+     */
 
     document.querySelectorAll(".folder").forEach(folder => {
 
@@ -330,28 +633,49 @@ document.addEventListener("DOMContentLoaded", function () {
         const children = folder.querySelector(".folder-children");
         const arrow = folder.querySelector(".folder-arrow");
 
-        // Restore previous state
+        if (!children || !arrow) {
+            return;
+        }
+
         if (expandedFolders.includes(path)) {
+
             children.classList.remove("d-none");
 
             arrow.classList.remove("bi-chevron-right");
             arrow.classList.add("bi-chevron-down");
+
         }
 
     });
+
+
+    /*
+     * FOLDER CLICK
+     */
 
     document.querySelectorAll(".folder-header").forEach(header => {
 
         header.addEventListener("click", function () {
 
             const folder = this.closest(".folder");
-            const children = this.nextElementSibling;
+
+            if (!folder) {
+                return;
+            }
+
+            const children = folder.querySelector(".folder-children");
             const arrow = this.querySelector(".folder-arrow");
             const path = folder.dataset.path;
 
+            if (!children || !arrow) {
+                return;
+            }
+
             children.classList.toggle("d-none");
 
-            const isExpanded = !children.classList.contains("d-none");
+            const isExpanded =
+                !children.classList.contains("d-none");
+
 
             arrow.classList.toggle(
                 "bi-chevron-right",
@@ -364,34 +688,61 @@ document.addEventListener("DOMContentLoaded", function () {
             );
 
 
-            let expanded =
-                JSON.parse(
-                    localStorage.getItem("expandedFolders") || "[]"
-                );
-
-
             if (isExpanded) {
 
-                if (!expanded.includes(path)) {
-                    expanded.push(path);
+                if (!expandedFolders.includes(path)) {
+                    expandedFolders.push(path);
                 }
 
             } else {
 
-                expanded = expanded.filter(item => item !== path);
+                expandedFolders =
+                    expandedFolders.filter(
+                        item => item !== path
+                    );
 
             }
 
 
             localStorage.setItem(
-                "expandedFolders",
-                JSON.stringify(expanded)
+                STORAGE_KEY,
+                JSON.stringify(expandedFolders)
             );
 
         });
 
     });
 
+
+    /*
+     * MOBILE:
+     * Close sidebar after selecting a file.
+     */
+
+    document.querySelectorAll(".file-tree a").forEach(link => {
+
+        link.addEventListener("click", function () {
+
+            if (window.innerWidth < 992) {
+
+                const sidebar =
+                    document.getElementById("fileSidebar");
+
+                const offcanvas =
+                    bootstrap.Offcanvas.getInstance(sidebar);
+
+                if (offcanvas) {
+                    offcanvas.hide();
+                }
+
+            }
+
+        });
+
+    });
+
 });
+
 </script>
+
 {% endblock %}

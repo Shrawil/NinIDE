@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.conf import settings
+from django.contrib import messages
 from django.core.management import call_command
 from .models import Project, File
 import subprocess
@@ -7,8 +8,75 @@ import os
 
 running_servers = {}
 
-def create_file(request, project_id):
+def create_project(request):
 
+    if request.method == "POST":
+
+        projectname = request.POST.get(
+            "projectname",
+            ""
+        ).strip()
+
+        if not projectname:
+            messages.error(
+                request,
+                "Project name cannot be empty."
+            )
+            return redirect("project_list")
+
+        project_path = (
+            settings.PROJECTS_DIR
+            / projectname
+        )
+
+        if project_path.exists():
+
+            messages.error(
+                request,
+                f"Project '{projectname}' already exists."
+            )
+
+            return redirect("project_list")
+
+        try:
+
+            call_command(
+                "startproject",
+                projectname,
+                project_path
+            )
+
+            project = Project.objects.create(
+                name=projectname
+            )
+
+            sync_project_files(project)
+
+        except Exception as e:
+
+            messages.error(
+                request,
+                f"Could not create project: {e}"
+            )
+
+            return redirect("project_list")
+
+        messages.success(
+            request,
+            f"Project '{projectname}' created successfully."
+        )
+
+        return redirect(
+            "editor",
+            project_id=project.id
+        )
+
+    return render(
+        request,
+        "new_project.html"
+    )
+
+def create_file(request, project_id):
     project = get_object_or_404(
         Project,
         id=project_id
@@ -16,12 +84,41 @@ def create_file(request, project_id):
 
     if request.method == "POST":
 
-        name = request.POST.get("name")
-        path = request.POST.get("path", "")
+        name = request.POST.get("name", "").strip()
+        path = request.POST.get("path", "").strip()
 
         project_path = settings.PROJECTS_DIR / project.name
-
         file_path = project_path / path / name
+
+        # Prevent paths such as ../../something
+        try:
+            file_path.resolve().relative_to(
+                project_path.resolve()
+            )
+        except ValueError:
+
+            messages.error(
+                request,
+                "Invalid file path."
+            )
+
+            return redirect(
+                "editor",
+                project_id=project.id
+            )
+
+        # Check if the file already exists
+        if file_path.exists():
+
+            messages.error(
+                request,
+                "Project already exists."
+            )
+
+            return redirect(
+                "editor",
+                project_id=project.id
+            )
 
         # Make sure the parent folder exists
         file_path.parent.mkdir(
@@ -43,15 +140,16 @@ def create_file(request, project_id):
             is_directory=False
         )
 
-        return redirect(
-            "editor",
-            project_id=project.id
+        messages.success(
+            request,
+            f"{name} created successfully."
         )
 
     return redirect(
         "editor",
         project_id=project.id
     )
+
 
 def create_folder(request, project_id):
 
@@ -262,14 +360,11 @@ def open_file(request, file_id):
 
 def terminal(request, project_id):
     project = get_object_or_404(Project, id=project_id)
-
     project_path = settings.PROJECTS_DIR / project.name
-
     output = ""
 
     if request.method == "POST":
-
-        command = request.POST.get("command")
+        command = request.POST.get("command", "").strip()
         action = request.POST.get("action")
         env = os.environ.copy()
         env.pop("DJANGO_SETTINGS_MODULE", None)
@@ -277,24 +372,22 @@ def terminal(request, project_id):
 
         if action == "stop":
             process = running_servers.get(project_id)
-
             if process and process.poll() is None:
                 process.terminate()
                 process.wait()
-
                 del running_servers[project_id]
-
                 output = "Server stopped."
-
             else:
                 output = "No server is running."
 
+        # Ignore empty form submissions when clicking "Run"
+        elif not command:
+            output = "Please enter a command."
+
         # Start Django server
         elif command == "python manage.py runserver":
-
             if project_id in running_servers:
                 output = "Server is already running."
-
             else:
                 process = subprocess.Popen(
                     [
@@ -310,21 +403,26 @@ def terminal(request, project_id):
                     stderr=subprocess.STDOUT,
                     text=True
                 )
-
                 running_servers[project_id] = process
-
                 output = "Development server started on port 8002."
 
         else:
-            result = subprocess.run(
-                command.split(),
-                cwd=project_path,
-                capture_output=True,
-                text=True,
-                env=env
-            )
-            output = result.stdout + result.stderr
-            sync_project_files(project)
+            try:
+                # Use shlex.split to handle quoted arguments correctly (e.g., git commit -m "my commit")
+                import shlex
+                cmd_args = shlex.split(command)
+                
+                result = subprocess.run(
+                    cmd_args,
+                    cwd=project_path,
+                    capture_output=True,
+                    text=True,
+                    env=env
+                )
+                output = result.stdout + result.stderr
+                sync_project_files(project)
+            except Exception as e:
+                output = f"Error executing command: {str(e)}"
 
     server_running = (
         project_id in running_servers
@@ -343,32 +441,6 @@ def terminal(request, project_id):
             "server_url": server_url,
         }
     )
-
-def create_project(request):
-    if request.method == "POST":
-        projectname = request.POST.get("projectname")
-        project = Project.objects.create(
-            name=projectname
-        )
-        project_path = settings.PROJECTS_DIR / projectname
-        project_path.mkdir(
-            parents=True,
-            exist_ok=True
-        )
-
-        call_command(
-            "startproject",
-            projectname,
-            project_path
-        )
-
-        sync_project_files(project)
-
-        return redirect(
-            "editor",
-            project_id=project.id
-        )
-    return render(request, "new_project.html")
 
 def editor(request, project_id):
 

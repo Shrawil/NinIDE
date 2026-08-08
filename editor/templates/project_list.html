@@ -1,23 +1,108 @@
 {% extends "base.html" %}
+
 {% block content %}
-{% if projects %}
-    <form method="POST" action="{% url 'new_project' %}" style="text-align: center;">
-        <br><h3>Create New project</h3><br>
-        {% csrf_token %}
-        <input placeholder="Enter project name" name="projectname">
-        <button type="submit">Create</button>
-    </form>
-    {% for project in projects %}
-    <ul>
-        <li><a href="{% url 'editor' project.id %}" class="link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover"> {{project.name}}</a></li>
-    </ul>
-    {% endfor %}
-    {% else %}
-    <form method="POST" action="{% url 'new_project' %}" style="text-align: center;">
-        <br><h3>Create New project</h3><br>
-        {% csrf_token %}
-        <input placeholder="Enter project name" name="projectname">
-        <button type="submit">Create</button>
-    </form>
+<div class="container py-4" style="max-width: 600px;">
+
+    <!-- FLASH MESSAGES -->
+    {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show border-0 shadow-sm" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
     {% endif %}
+
+    <!-- CREATE PROJECT CARD -->
+    <div class="card bg-dark text-light border-secondary shadow mb-4">
+        <div class="card-body p-4">
+            <h4 class="card-title text-center mb-3">
+                <i class="bi bi-folder-plus me-2 text-primary"></i>Create New Project
+            </h4>
+            
+            <form method="POST" action="{% url 'new_project' %}">
+                {% csrf_token %}
+                <div class="input-group">
+                    <input 
+                        type="text" 
+                        class="form-control bg-secondary text-light border-secondary" 
+                        placeholder="Enter project name..." 
+                        name="projectname"
+                        required
+                        autocomplete="off"
+                    >
+                    <button class="btn btn-primary px-4" type="submit">
+                        <i class="bi bi-plus-lg me-1"></i>Create
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- PROJECTS LIST -->
+    <div class="projects-section">
+        <h5 class="text-secondary mb-3 fs-6 text-uppercase fw-bold tracking-wide">Your Projects</h5>
+        
+        {% if projects %}
+            <div class="list-group shadow">
+                {% for project in projects %}
+                    <a 
+                        href="{% url 'editor' project.id %}" 
+                        class="list-group-item list-group-item-action bg-dark text-light border-secondary d-flex justify-content-between align-items-center py-3 px-3 project-item"
+                    >
+                        <div class="d-flex align-items-center min-width-0">
+                            <i class="bi bi-code-square text-info fs-5 me-3"></i>
+                            <span class="fw-semibold text-truncate">{{ project.name }}</span>
+                        </div>
+                        <i class="bi bi-chevron-right text-secondary fs-6"></i>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5 border border-dashed border-secondary rounded bg-dark">
+                <i class="bi bi-folder2-open text-secondary display-4 d-block mb-2"></i>
+                <p class="text-muted mb-0">No projects yet. Create one above to get started!</p>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
+
+{% block css %}
+<style>
+    body {
+        background-color: #1e1e1e;
+        color: #d4d4d4;
+    }
+
+    /* Input focus overrides */
+    .form-control:focus {
+        background-color: #2b2d30 !important;
+        color: #fff !important;
+        border-color: #0e639c !important;
+        box-shadow: 0 0 0 0.25rem rgba(14, 99, 156, 0.25) !important;
+    }
+
+    .form-control::placeholder {
+        color: #858585;
+    }
+
+    /* List item hover styling */
+    .project-item {
+        transition: background-color 0.15s ease-in-out, transform 0.15s ease-in-out;
+    }
+
+    .project-item:hover {
+        background-color: #2d2d2d !important;
+        color: #fff !important;
+    }
+
+    /* Border dash utility for empty state */
+    .border-dashed {
+        border-style: dashed !important;
+    }
+</style>
 {% endblock %}
