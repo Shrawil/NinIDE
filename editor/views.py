@@ -1,12 +1,39 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.conf import settings
-from django.contrib import messages
+from django.contrib import messages, sessions
 from django.core.management import call_command
 from .models import Project, File
+from django.contrib.auth.hashers import make_password
 import subprocess
 import os
 
 running_servers = {}
+
+from functools import wraps
+from django.shortcuts import redirect
+
+
+def project_auth_required(view_func):
+    @wraps(view_func)
+    def wrapper(request, project_id, *args, **kwargs):
+
+        if not request.session.get(
+            f"project_{project_id}_auth",
+            False
+        ):
+            return redirect(
+                "project_password",
+                project_id=project_id
+            )
+
+        return view_func(
+            request,
+            project_id,
+            *args,
+            **kwargs
+        )
+
+    return wrapper
 
 def create_project(request):
 
@@ -17,10 +44,22 @@ def create_project(request):
             ""
         ).strip()
 
+        projectpassword = request.POST.get(
+            "projectpassword",
+            ""
+        ).strip()
+
         if not projectname:
             messages.error(
                 request,
                 "Project name cannot be empty."
+            )
+            return redirect("project_list")
+
+        elif not projectpassword:
+            messages.error(
+                request,
+                "You must set a project password."
             )
             return redirect("project_list")
 
@@ -47,7 +86,8 @@ def create_project(request):
             )
 
             project = Project.objects.create(
-                name=projectname
+                name=projectname,
+                password=make_password(projectpassword)
             )
 
             sync_project_files(project)
@@ -66,6 +106,7 @@ def create_project(request):
             f"Project '{projectname}' created successfully."
         )
 
+        request.session[f"project_{project.id}_auth"] = True
         return redirect(
             "editor",
             project_id=project.id
@@ -76,6 +117,7 @@ def create_project(request):
         "new_project.html"
     )
 
+@project_auth_required
 def create_file(request, project_id):
     project = get_object_or_404(
         Project,
@@ -151,6 +193,7 @@ def create_file(request, project_id):
     )
 
 
+@project_auth_required
 def create_folder(request, project_id):
 
     project = get_object_or_404(
@@ -291,12 +334,24 @@ def sync_project_files(project):
         path__in=existing_paths
     ).delete()
 
-def save_file(request, file_id):
 
+def save_file(request, file_id):
     file = get_object_or_404(
         File,
-        id=file_id
+        id=file_id,
+        is_directory=False
     )
+
+    project = file.project
+
+    if not request.session.get(
+        f"project_{project.id}_auth",
+        False
+    ):
+        return redirect(
+            "project_password",
+            project_id=project.id
+        )
 
     if request.method == "POST":
 
@@ -336,6 +391,7 @@ def project_list(request):
         {"projects": projects}
     )
 
+
 def open_file(request, file_id):
 
     file = get_object_or_404(
@@ -358,6 +414,19 @@ def open_file(request, file_id):
         }
     )
 
+import socket, shlex, os
+
+def find_free_port(start=8000):
+    port = start
+
+    while True:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            if s.connect_ex(("127.0.0.1", port)) != 0:
+                return port
+        port += 1
+
+
+@project_auth_required
 def terminal(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     project_path = settings.PROJECTS_DIR / project.name
@@ -366,35 +435,48 @@ def terminal(request, project_id):
     if request.method == "POST":
         command = request.POST.get("command", "").strip()
         action = request.POST.get("action")
+
         env = os.environ.copy()
         env.pop("DJANGO_SETTINGS_MODULE", None)
         env["PYTHONPATH"] = str(project_path)
 
+        # Stop server
         if action == "stop":
-            process = running_servers.get(project_id)
-            if process and process.poll() is None:
-                process.terminate()
-                process.wait()
-                del running_servers[project_id]
-                output = "Server stopped."
+            server = running_servers.get(project_id)
+
+            if server:
+                process = server["process"]
+
+                if process.poll() is None:
+                    process.terminate()
+                    process.wait()
+                    del running_servers[project_id]
+                    output = "Server stopped."
+                else:
+                    del running_servers[project_id]
+                    output = "Server was no longer running."
             else:
                 output = "No server is running."
 
-        # Ignore empty form submissions when clicking "Run"
+        # Empty command
         elif not command:
             output = "Please enter a command."
 
         # Start Django server
         elif command == "python manage.py runserver":
+
             if project_id in running_servers:
                 output = "Server is already running."
+
             else:
+                port = find_free_port()
+
                 process = subprocess.Popen(
                     [
                         "python",
                         "manage.py",
                         "runserver",
-                        "8002",
+                        str(port),
                         "--noreload"
                     ],
                     cwd=project_path,
@@ -403,15 +485,19 @@ def terminal(request, project_id):
                     stderr=subprocess.STDOUT,
                     text=True
                 )
-                running_servers[project_id] = process
-                output = "Development server started on port 8002."
 
+                running_servers[project_id] = {
+                    "process": process,
+                    "port": port,
+                }
+
+                output = f"Development server started on port {port}."
+
+        # Other commands
         else:
             try:
-                # Use shlex.split to handle quoted arguments correctly (e.g., git commit -m "my commit")
-                import shlex
                 cmd_args = shlex.split(command)
-                
+
                 result = subprocess.run(
                     cmd_args,
                     cwd=project_path,
@@ -419,17 +505,32 @@ def terminal(request, project_id):
                     text=True,
                     env=env
                 )
+
                 output = result.stdout + result.stderr
+
                 sync_project_files(project)
+
             except Exception as e:
                 output = f"Error executing command: {str(e)}"
 
-    server_running = (
-        project_id in running_servers
-        and running_servers[project_id].poll() is None
-    )
+    # Get current server information
+    server = running_servers.get(project_id)
 
-    server_url = "http://127.0.0.1:8002/"
+    if server:
+        process = server["process"]
+
+        # Clean up dead processes
+        if process.poll() is not None:
+            del running_servers[project_id]
+            server = None
+
+    server_running = server is not None
+
+    server_url = (
+        f"http://127.0.0.1:{server['port']}/"
+        if server
+        else None
+    )
 
     return render(
         request,
@@ -442,6 +543,89 @@ def terminal(request, project_id):
         }
     )
 
+from django.contrib.auth.hashers import check_password
+
+def delete_project(request, project_id):
+    project = get_object_or_404(
+        Project,
+        id=project_id
+    )
+    error = ""
+    if request.method == "POST":
+        password = request.POST.get("password")
+        if check_password(password, project.password):
+            project_path = settings.PROJECTS_DIR / project.name
+            server = running_servers.get(project_id)
+            if server:
+                process = server["process"]
+
+                if process.poll() is None:
+                    process.terminate()
+                    process.wait()
+
+                del running_servers[project_id]
+
+            # Delete files
+            import shutil
+
+            if project_path.exists():
+                shutil.rmtree(project_path)
+
+            # Delete database record
+            project.delete()
+            return redirect("project_list")
+        else:
+            error = "Incorrect password."
+            return render(
+                request,
+                "project_password.html",
+                {
+                    "project":project,
+                    "error":error
+                }
+            )
+    return render(
+        request,
+        "project_password.html",
+        {
+            "project":project
+        }
+    )
+
+def project_password(request, project_id):
+    project = get_object_or_404(
+        Project,
+        id=project_id
+    )
+    error = ""
+    if request.method == "POST":
+        password = request.POST.get("password")
+        if check_password(password, project.password):
+            request.session[f"project_{project_id}_auth"] = True
+            return redirect(
+                'editor', 
+                project_id
+            )
+        else:
+            error = "Incorrect password."
+            return render(
+                request,
+                "project_password.html",
+                {
+                    "project":project,
+                    "error":error
+                }
+            )
+    return render(
+        request,
+        "project_password.html",
+        {
+            "project":project
+        }
+    )
+
+
+@project_auth_required
 def editor(request, project_id):
 
     project = get_object_or_404(

@@ -8,6 +8,16 @@ urlpatterns = [
         name="project_list"
     ),
     path(
+        "delete_project/<int:project_id>",
+        views.delete_project,
+        name="delete_project",
+    ),
+    path(
+        "project_password/<int:project_id>/",
+        views.project_password,
+        name="project_password"
+    ),
+    path(
         "project/<int:project_id>/",
         views.editor,
         name="editor"
