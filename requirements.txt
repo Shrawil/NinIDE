@@ -11,3 +11,4 @@ python-discovery==1.5.1
 sqlparse==0.5.5
 tzdata==2026.3
 virtualenv==21.7.1
+psycopg[binary]
