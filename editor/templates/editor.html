@@ -27,10 +27,26 @@
 
     /* Outer Layout Structure */
     .ide-layout {
-        display: flex;
-        height: calc(100vh - 56px); /* Adjust to match navbar height */
+        display: flex !important;
+        flex-direction: row !important;
+        height: calc(100vh - 56px);
         overflow: hidden;
         background-color: var(--ide-bg);
+    }
+
+    @media (min-width: 992px) {
+        .file-sidebar.offcanvas-lg {
+            flex: 0 0 260px !important;
+            width: 260px !important;
+            height: 100% !important;
+            overflow-y: auto;
+        }
+    }
+
+    .editor-area {
+        flex: 1 1 0;
+        min-width: 0;
+        height: 100%;
     }
 
     /* Mobile Sidebar / Offcanvas Width Fix */
