@@ -464,9 +464,13 @@ def terminal(request, project_id):
 
         # Start Django server
         elif command == "python manage.py runserver":
-
             if project_id in running_servers:
-                output = "Server is already running."
+                process = running_servers[project_id]["process"]
+
+                if process.poll() is None:
+                    output = "Server is already running."
+                else:
+                    del running_servers[project_id]
 
             else:
                 port = find_free_port()
@@ -477,22 +481,28 @@ def terminal(request, project_id):
                         "manage.py",
                         "runserver",
                         str(port),
-                        "--noreload"
+                        "--noreload",
                     ],
                     cwd=project_path,
                     env=env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
-                    text=True
+                    text=True,
                 )
 
-                running_servers[project_id] = {
-                    "process": process,
-                    "port": port,
-                }
+                # Give Django a moment to start
+                import time
+                time.sleep(1)
 
-                output = f"Development server started on port {port}."
+                if process.poll() is not None:
+                    output = process.stdout.read()
+                else:
+                    running_servers[project_id] = {
+                        "process": process,
+                        "port": port,
+                    }
 
+                    output = f"Development server started on port {port}."
         # Other commands
         else:
             try:
